@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shift & Payroll Master</title>
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SheetJS for Excel Import/Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --radius: 0.75rem;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        
+        body { background-color: var(--background); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Layout */
+        aside { width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 20; }
+        main { flex: 1; overflow-y: auto; padding: 2rem; position: relative; }
+
+        /* Sidebar */
+        .brand { padding: 1.5rem; font-size: 1.25rem; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; }
+        .nav-menu { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: var(--text-muted); text-decoration: none; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; }
+        .nav-item:hover, .nav-item.active { background-color: #eff6ff; color: var(--primary); font-weight: 500; }
+        
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        h1 { font-size: 1.5rem; font-weight: 700; }
+        .btn { padding: 0.6rem 1.2rem; border-radius: 0.5rem; border: none; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; transition: 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-danger { background: var(--danger); color: white; }
+
+        /* Dashboard Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--surface); padding: 1.5rem; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--text-main); margin: 0.5rem 0; }
+        .stat-label { color: var(--text-muted); font-size: 0.875rem; }
+
+        /* Employee Cards */
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; }
+        .emp-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); padding: 1.5rem; position: relative; transition: transform 0.2s; }
+        .emp-card:hover { transform: translateY(-2px); }
+        .emp-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; position: relative; }
+        .emp-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); background-color: #e2e8f0; }
+        .emp-info h3 { font-size: 1.1rem; font-weight: 600; }
+        .emp-info p { color: var(--text-muted); font-size: 0.875rem; }
+        .emp-menu-btn { position: absolute; top: 0; right: 0; background: none; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted); padding: 0.25rem; }
+        
+        .dropdown-menu { position: absolute; top: 40px; right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; box-shadow: var(--shadow); width: 200px; z-index: 50; display: none; flex-direction: column; overflow: hidden; }
+        .dropdown-menu.show { display: flex; }
+        .dropdown-item { padding: 0.75rem 1rem; text-align: left; border: none; background: none; cursor: pointer; font-size: 0.875rem; color: var(--text-main); }
+        .dropdown-item:hover { background: var(--background); }
+
+        .emp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+        .stat-box small { display: block; color: var(--text-muted); font-size: 0.75rem; }
+        .stat-box strong { font-size: 1.1rem; color: var(--text-main); }
+        .balance-positive { color: var(--success); }
+        .balance-negative { color: var(--danger); }
+
+        /* Tables */
+        .table-container { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--border); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f1f5f9; font-weight: 600; font-size: 0.875rem; color: var(--text-muted); }
+        tr:last-child td { border-bottom: none; }
+        
+        /* Forms & Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 100; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: var(--surface); width: 100%; max-width: 500px; border-radius: var(--radius); padding: 2rem; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
+        .form-control { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; font-size: 1rem; }
+        
+        /* Photo Upload Styles */
+        .photo-upload-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .photo-preview {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px dashed var(--border);
+            margin-bottom: 0.5rem;
+            background-color: #f8fafc;
+        }
+        .file-input-label {
+            font-size: 0.875rem;
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .checkbox-group { display: flex; gap: 1rem; }
+        
+        /* Filters & Search */
+        .toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .search-input { flex: 1; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.5rem; min-width: 200px; }
+
+        /* Toast */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); animation: slideIn 0.3s ease; display: flex; align-items: center; gap: 10px; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Print Specifics */
+        @media print {
+            aside, .btn, .emp-menu-btn, .dropdown-menu, .toolbar { display: none !important; }
+            body, main { height: auto; overflow: visible; background: white; }
+            .card-grid { display: block; }
+            .emp-card { break-inside: avoid; margin-bottom: 20px; border: 1px solid #ccc; box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside>
+    <div class="brand">
+        <i class="fa-solid fa-layer-group"></i> ShiftMaster
+    </div>
+    <div class="nav-menu">
+        <div class="nav-item active" onclick="router('home')"><i class="fa-solid fa-home"></i> Home</div>
+        <div class="nav-item" onclick="router('employees')"><i class="fa-solid fa-users"></i> Employees</div>
+        <div class="nav-item" onclick="router('shifts')"><i class="fa-solid fa-clock"></i> Shift History</div>
+        <div class="nav-item" onclick="router('advances')"><i class="fa-solid fa-money-bill-wave"></i> Advance History</div>
+        <div class="nav-item" onclick="router('balance')"><i class="fa-solid fa-scale-balanced"></i> Balance Report</div>
+        <div class="nav-item" onclick="router('import')"><i class="fa-solid fa-file-excel"></i> Import/Export</div>
+        <div class="nav-item" onclick="router('reports')"><i class="fa-solid fa-chart-pie"></i> Reports</div>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main id="app">
+    <!-- Dynamic Content Injected Here -->
+</main>
+
+<!-- Modals -->
+<!-- Add Employee Modal -->
+<div id="modal-employee" class="modal-overlay">
+    <div class="modal">
+        <h2 id="modal-title" style="margin-bottom: 1.5rem;">Add Employee</h2>
+        <form id="form-employee">
+            <input type="hidden" id="emp-edit-id">
+            
+            <!-- Photo Upload Section -->
+            <div class="photo-upload-wrapper">
+                <img id="emp-photo-preview" src="https://via.placeholder.com/100?text=No+Photo" class="photo-preview" alt="Preview">
+                <input type="file" id="emp-photo-input" accept="image/*" style="display: none;" onchange="previewPhoto(this)">
+                <label for="emp-photo-input" class="file-input-label"><i class="fa-solid fa-camera"></i> Upload Photo</label>
+            </div>
+
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="emp-name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Mobile Number</label>
+                <input type="tel" id="emp-mobile" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <input type="text" id="emp-address" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Shift Rate (₹)</label>
+                <input type="number" id="emp-rate" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="emp-status" class="form-control">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="closeModals()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Shift Modal -->
+<div id="modal-shift" class="modal-overlay">
+    <div class="modal">
+        <h2 style="margin-bottom: 1.5rem;">Add Shift</h2>
+        <form id="form-shift">
+            <input type="hidden" id="shift-emp-id">
+            <div class="form-group">
+                <label>Employee</label>
+                <select id="shift-emp-select" class="form-control" required></select>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="shift-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Shift Types (I, II, III)</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" value="I" class="shift-check"> I (Morning)</label>
+                    <label><input type="checkbox" value="II" class="shift-check"> II (Evening)</label>
+                    <label><input type="checkbox" value="III" class="shift-check"> III (Night)</label>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="closeModals()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Shifts</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Advance Modal -->
+<div id="modal-advance" class="modal-overlay">
+    <div class="modal">
+        <h2 style="margin-bottom: 1.5rem;">Add Advance</h2>
+        <form id="form-advance">
+            <input type="hidden" id="adv-emp-id">
+            <div class="form-group">
+                <label>Employee</label>
+                <select id="adv-emp-select" class="form-control" required></select>
+            </div>
+            <div class="form-group">
+                <label>Amount (₹)</label>
+                <input type="number" id="adv-amount" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="adv-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Remark</label>
+                <input type="text" id="adv-remark" class="form-control">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="closeModals()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Advance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+    // --- State Management ---
+    const state = {
+        view: 'home',
+        employees: JSON.parse(localStorage.getItem('employees')) || [],
+        shifts: JSON.parse(localStorage.getItem('shifts')) || [],
+        advances: JSON.parse(localStorage.getItem('advances')) || [],
+        imports: JSON.parse(localStorage.getItem('imports')) || [],
+        currentUser: 'Admin', // Simulating Auth
+        tempPhoto: null // Temporary holder for photo Base64
+    };
+
+    function saveData() {
+        localStorage.setItem('employees', JSON.stringify(state.employees));
+        localStorage.setItem('shifts', JSON.stringify(state.shifts));
+        localStorage.setItem('advances', JSON.stringify(state.advances));
+        localStorage.setItem('imports', JSON.stringify(state.imports));
+        render();
+    }
+
+    function showToast(msg, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.borderLeft = `4px solid ${type === 'success' ? '#10b981' : '#ef4444'}`;
+        toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i> ${msg}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    function generateId(prefix) {
+        return prefix + Math.random().toString(36).substr(2, 5).toUpperCase();
+    }
+
+    // --- Photo Handling ---
+    function previewPhoto(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('emp-photo-preview').src = e.target.result;
+                state.tempPhoto = e.target.result; // Store Base64 in temp state
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // --- Business Logic ---
+    function getEmployeeStats(id) {
+        const empShifts = state.shifts.filter(s => s.empId === id);
+        const totalShifts = empShifts.length;
+        const emp = state.employees.find(e => e.id === id);
+        const totalEarnings = totalShifts * (emp ? emp.rate : 0);
+        
+        const totalAdvance = state.advances
+            .filter(a => a.empId === id)
+            .reduce((sum, a) => sum + parseFloat(a.amount), 0);
+        
+        return {
+            shifts: totalShifts,
+            earnings: totalEarnings,
+            advance: totalAdvance,
+            balance: totalEarnings - totalAdvance
+        };
+    }
+
+    function getGlobalStats() {
+        const totalEmps = state.employees.length;
+        const totalShifts = state.shifts.length;
+        const totalEarnings = state.shifts.reduce((sum, s) => {
+            const emp = state.employees.find(e => e.id === s.empId);
+            return sum + (emp ? emp.rate : 0);
+        }, 0);
+        const totalAdvance = state.advances.reduce((sum, a) => sum + parseFloat(a.amount), 0);
+        
+        return { totalEmps, totalShifts, totalEarnings, totalAdvance, balance: totalEarnings - totalAdvance };
+    }
+
+    // --- View Components ---
+
+    function renderHome() {
+        const stats = getGlobalStats();
+        
+        // Generate Employee Cards
+        let cardsHtml = state.employees.map(emp => {
+            const stats = getEmployeeStats(emp.id);
+            // Use photo if available, otherwise random seed based on ID
+            const displayPhoto = emp.photo || `https://picsum.photos/seed/${emp.id}/200/200`;
+            
+            return `
+            <div class="emp-card">
+                <div class="emp-header">
+                    <img src="${displayPhoto}" class="emp-avatar" alt="Photo">
+                    <div class="emp-info">
+                        <h3>${emp.name}</h3>
+                        <p>ID: ${emp.employeeId} • ${emp.status}</p>
+                    </div>
+                    <button class="emp-menu-btn" onclick="toggleMenu('${emp.id}')">⋮</button>
+                    <div id="menu-${emp.id}" class="dropdown-menu">
+                        <button class="dropdown-item" onclick="openShiftModal('${emp.id}')"><i class="fa-solid fa-clock"></i> Add Shift</button>
+                        <button class="dropdown-item" onclick="openAdvanceModal('${emp.id}')"><i class="fa-solid fa-money-bill"></i> Add Advance</button>
+                        <button class="dropdown-item" onclick="viewEmployeeDetail('${emp.id}')"><i class="fa-solid fa-eye"></i> View Details</button>
+                        <button class="dropdown-item" onclick="editEmployee('${emp.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
+                        <button class="dropdown-item" style="color:var(--danger)" onclick="deleteEmployee('${emp.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+                <div class="emp-stats">
+                    <div class="stat-box"><small>Shifts</small><strong>${stats.shifts}</strong></div>
+                    <div class="stat-box"><small>Earnings</small><strong>₹${stats.earnings.toLocaleString()}</strong></div>
+                    <div class="stat-box"><small>Advance</small><strong>₹${stats.advance.toLocaleString()}</strong></div>
+                    <div class="stat-box"><small>Balance</small><strong class="${stats.balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${stats.balance.toLocaleString()}</strong></div>
+                </div>
+            </div>
+            `;
+        }).join('');
+
+        return `
+            <header>
+                <h1>Dashboard</h1>
+                <button class="btn btn-primary" onclick="openEmployeeModal()"><i class="fa-solid fa-plus"></i> Add Employee</button>
+            </header>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Employees</div>
+                    <div class="stat-value">${stats.totalEmps}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Shifts (All Time)</div>
+                    <div class="stat-value">${stats.totalShifts}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Advances</div>
+                    <div class="stat-value" style="color:var(--danger)">₹${stats.totalAdvance.toLocaleString()}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Outstanding Balance (Payable)</div>
+                    <div class="stat-value" style="color:var(--primary)">₹${stats.balance.toLocaleString()}</div>
+                </div>
+            </div>
+            <h2 style="margin-bottom: 1rem;">Employees</h2>
+            <div class="card-grid">
+                ${cardsHtml || '<p style="color:var(--text-muted)">No employees added yet.</p>'}
+            </div>
+        `;
+    }
+
+    function renderTable(type) {
+        const isShift = type === 'shifts';
+        const data = isShift ? state.shifts : state.advances;
+        
+        const rows = data.slice().reverse().map(row => {
+            const emp = state.employees.find(e => e.id === row.empId);
+            if (!emp) return '';
+            if (isShift) {
+                return `<tr>
+                    <td>${emp.name}</td>
+                    <td>${row.date}</td>
+                    <td><span style="font-weight:bold; color:var(--primary)">${row.type}</span></td>
+                    <td>${row.addedBy}</td>
+                    <td>${new Date(row.createdAt).toLocaleString()}</td>
+                </tr>`;
+            } else {
+                return `<tr>
+                    <td>${emp.name}</td>
+                    <td>${row.date}</td>
+                    <td>₹${parseFloat(row.amount).toLocaleString()}</td>
+                    <td>${row.remark}</td>
+                    <td>${row.addedBy}</td>
+                </tr>`;
+            }
+        }).join('');
+
+        return `
+            <header>
+                <h1>${isShift ? 'Shift History' : 'Advance History'}</h1>
+            </header>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Date</th>
+                            <th>${isShift ? 'Shift Type' : 'Amount'}</th>
+                            <th>${isShift ? '' : 'Remark'}</th>
+                            <th>${isShift ? 'Added By' : 'Added By'}</th>
+                            <th>${isShift ? 'Created At' : ''}</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows || '<tr><td colspan="6" style="text-align:center">No data found</td></tr>'}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderBalance() {
+        const rows = state.employees.map(emp => {
+            const stats = getEmployeeStats(emp.id);
+            return `<tr>
+                <td>
+                    <div style="display:flex; align-items:center; gap:10px">
+                        <img src="${emp.photo || `https://picsum.photos/seed/${emp.id}/30/30`}" style="width:30px; height:30px; border-radius:50%">
+                        ${emp.name}
+                    </div>
+                </td>
+                <td>${stats.shifts}</td>
+                <td>₹${emp.rate}</td>
+                <td>₹${stats.earnings.toLocaleString()}</td>
+                <td style="color:var(--danger)">₹${stats.advance.toLocaleString()}</td>
+                <td style="font-weight:bold; color: ${stats.balance >= 0 ? 'var(--success)' : 'var(--danger)'}">₹${stats.balance.toLocaleString()}</td>
+            </tr>`;
+        }).join('');
+
+        return `
+            <header>
+                <h1>Employee Balance Report</h1>
+                <div>
+                    <button class="btn btn-outline" onclick="window.print()"><i class="fa-solid fa-print"></i> Print</button>
+                    <button class="btn btn-outline" onclick="exportBalanceExcel()"><i class="fa-solid fa-file-excel"></i> Export Excel</button>
+                </div>
+            </header>
+            <div class="table-container">
+                <table id="balance-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Total Shifts</th>
+                            <th>Shift Rate</th>
+                            <th>Total Earnings</th>
+                            <th>Total Advance</th>
+                            <th>Final Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function renderImport() {
+        const history = state.imports.slice().reverse().map(i => `
+            <tr>
+                <td>${i.fileName}</td>
+                <td>${i.date}</td>
+                <td>${i.total}</td>
+                <td style="color:var(--success)">${i.success}</td>
+                <td style="color:var(--danger)">${i.failed}</td>
+            </tr>
+        `).join('');
+
+        return `
+            <header>
+                <h1>Import Shifts (Excel)</h1>
+            </header>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Upload File</h3>
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin:1rem 0;">Expected Columns: Employee ID, Employee Name, Date, Shift (I, II, III)</p>
+                    <input type="file" id="excel-input" accept=".xlsx, .xls" class="form-control" style="margin-bottom:1rem">
+                    <button class="btn btn-primary" onclick="processExcel()"><i class="fa-solid fa-upload"></i> Import Data</button>
+                </div>
+                <div class="stat-card" style="grid-column: span 2;">
+                    <h3>Import History</h3>
+                    <div class="table-container" style="margin-top:1rem; box-shadow:none; border:none;">
+                        <table>
+                            <thead><tr><th>File Name</th><th>Date</th><th>Total Rows</th><th>Success</th><th>Failed</th></tr></thead>
+                            <tbody>${history || '<tr><td colspan="5" style="text-align:center">No imports yet</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderReports() {
+        setTimeout(() => {
+            const ctx = document.getElementById('reportChart').getContext('2d');
+            if(window.myChart) window.myChart.destroy();
+            
+            const stats = getGlobalStats();
+            window.myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Paid (Advances)', 'Pending (Balance)'],
+                    datasets: [{
+                        data: [stats.totalAdvance, stats.balance],
+                        backgroundColor: ['#ef4444', '#2563eb']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }, 100);
+
+        return `
+            <header><h1>Analytics & Reports</h1></header>
+            <div class="stats-grid">
+                <div class="stat-card" style="height:300px; display:flex; flex-direction:column;">
+                    <h3>Payment Distribution</h3>
+                    <div style="flex:1; position:relative;">
+                        <canvas id="reportChart"></canvas>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <h3>Summary</h3>
+                    <ul style="list-style:none; margin-top:1rem;">
+                        <li style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+                            <span>Total Earnings Generated</span>
+                            <strong>₹${getGlobalStats().totalEarnings.toLocaleString()}</strong>
+                        </li>
+                        <li style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+                            <span>Total Paid Out</span>
+                            <strong>₹${getGlobalStats().totalAdvance.toLocaleString()}</strong>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderEmployeeDetail(id) {
+        const emp = state.employees.find(e => e.id === id);
+        if(!emp) return router('home');
+        const stats = getEmployeeStats(id);
+        const displayPhoto = emp.photo || `https://picsum.photos/seed/${emp.id}/200/200`;
+        
+        const shifts = state.shifts.filter(s => s.empId === id).reverse().map(s => 
+            `<tr><td>${s.date}</td><td>${s.type}</td><td>${s.addedBy}</td></tr>`
+        ).join('');
+
+        const adv = state.advances.filter(a => a.empId === id).reverse().map(a => 
+            `<tr><td>${a.date}</td><td>₹${a.amount}</td><td>${a.remark}</td></tr>`
+        ).join('');
+
+        return `
+            <button class="btn btn-outline" onclick="router('home')" style="margin-bottom:1rem"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <div style="display:flex; gap:2rem; flex-wrap:wrap">
+                <div class="emp-card" style="flex:1; min-width:300px">
+                    <div class="emp-header">
+                        <img src="${displayPhoto}" class="emp-avatar" style="width:100px; height:100px; border:3px solid var(--border)">
+                        <div>
+                            <h2>${emp.name}</h2>
+                            <p>${emp.employeeId}</p>
+                            <p>${emp.mobile}</p>
+                        </div>
+                    </div>
+                    <div class="emp-stats">
+                        <div class="stat-box"><small>Shifts</small><strong>${stats.shifts}</strong></div>
+                        <div class="stat-box"><small>Earnings</small><strong>₹${stats.earnings.toLocaleString()}</strong></div>
+                        <div class="stat-box"><small>Advance</small><strong>₹${stats.advance.toLocaleString()}</strong></div>
+                        <div class="stat-box"><small>Balance</small><strong class="${stats.balance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${stats.balance.toLocaleString()}</strong></div>
+                    </div>
+                </div>
+                <div class="table-container" style="flex:2; min-width:300px">
+                    <div style="padding:1rem; border-bottom:1px solid var(--border); font-weight:bold">Recent Shifts</div>
+                    <table>
+                        <thead><tr><th>Date</th><th>Type</th><th>By</th></tr></thead>
+                        <tbody>${shifts || '<tr><td colspan="3">No shifts</td></tr>'}</tbody>
+                    </table>
+                    <div style="padding:1rem; border-top:1px solid var(--border); font-weight:bold">Recent Advances</div>
+                    <table>
+                        <thead><tr><th>Date</th><th>Amount</th><th>Remark</th></tr></thead>
+                        <tbody>${adv || '<tr><td colspan="3">No advances</td></tr>'}</tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- Routing & Rendering ---
+    function router(view) {
+        state.view = view;
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const navIndex = ['home', 'employees', 'shifts', 'advances', 'balance', 'import', 'reports'].indexOf(view);
+        if(navIndex >= 0) document.querySelectorAll('.nav-item')[navIndex].classList.add('active');
+        
+        const app = document.getElementById('app');
+        if(view === 'home' || view === 'employees') app.innerHTML = renderHome();
+        else if(view === 'shifts') app.innerHTML = renderTable('shifts');
+        else if(view === 'advances') app.innerHTML = renderTable('advances');
+        else if(view === 'balance') app.innerHTML = renderBalance();
+        else if(view === 'import') app.innerHTML = renderImport();
+        else if(view === 'reports') app.innerHTML = renderReports();
+    }
+
+    function render() {
+        router(state.view);
+    }
+
+    // --- Interactions ---
+
+    function toggleMenu(id) {
+        document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('show'));
+        const menu = document.getElementById(`menu-${id}`);
+        if(menu) menu.classList.toggle('show');
+    }
+
+    document.addEventListener('click', (e) => {
+        if(!e.target.closest('.emp-card')) {
+            document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('show'));
+        }
+    });
+
+    function closeModals() {
+        document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('open'));
+        state.tempPhoto = null; // Clear temp photo
+    }
+
+    function openEmployeeModal() {
+        document.getElementById('form-employee').reset();
+        document.getElementById('emp-edit-id').value = '';
+        // Reset photo preview
+        document.getElementById('emp-photo-preview').src = "https://via.placeholder.com/100?text=No+Photo";
+        document.getElementById('modal-title').innerText = 'Add Employee';
+        document.getElementById('modal-employee').classList.add('open');
+    }
+
+    function editEmployee(id) {
+        const emp = state.employees.find(e => e.id === id);
+        if(!emp) return;
+        document.getElementById('emp-edit-id').value = emp.id;
+        document.getElementById('emp-name').value = emp.name;
+        document.getElementById('emp-mobile').value = emp.mobile;
+        document.getElementById('emp-address').value = emp.address;
+        document.getElementById('emp-rate').value = emp.rate;
+        document.getElementById('emp-status').value = emp.status;
+        
+        // Load existing photo
+        if(emp.photo) {
+            document.getElementById('emp-photo-preview').src = emp.photo;
+            state.tempPhoto = emp.photo;
+        } else {
+            document.getElementById('emp-photo-preview').src = "https://via.placeholder.com/100?text=No+Photo";
+            state.tempPhoto = null;
+        }
+
+        document.getElementById('modal-title').innerText = 'Edit Employee';
+        document.getElementById('modal-employee').classList.add('open');
+        document.getElementById(`menu-${id}`).classList.remove('show');
+    }
+
+    document.getElementById('form-employee').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('emp-edit-id').value;
+        const data = {
+            name: document.getElementById('emp-name').value,
+            mobile: document.getElementById('emp-mobile').value,
+            address: document.getElementById('emp-address').value,
+            rate: parseFloat(document.getElementById('emp-rate').value),
+            status: document.getElementById('emp-status').value,
+            photo: state.tempPhoto // Save the photo from temp state
+        };
+
+        if(id) {
+            const idx = state.employees.findIndex(x => x.id === id);
+            state.employees[idx] = { ...state.employees[idx], ...data };
+            showToast('Employee updated');
+        } else {
+            state.employees.push({
+                id: generateId('E'),
+                employeeId: 'EMP' + Math.floor(1000 + Math.random() * 9000),
+                ...data,
+                joiningDate: new Date().toISOString()
+            });
+            showToast('Employee added');
+        }
+        saveData();
+        closeModals();
+    });
+
+    function deleteEmployee(id) {
+        if(confirm('Are you sure? This will delete all history.')) {
+            state.employees = state.employees.filter(e => e.id !== id);
+            state.shifts = state.shifts.filter(s => s.empId !== id);
+            state.advances = state.advances.filter(a => a.empId !== id);
+            saveData();
+            showToast('Employee deleted');
+        }
+    }
+
+    // Shift Logic
+    function openShiftModal(empId = null) {
+        const select = document.getElementById('shift-emp-select');
+        select.innerHTML = state.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+        if(empId) select.value = empId;
+        document.getElementById('shift-date').valueAsDate = new Date();
+        document.querySelectorAll('.shift-check').forEach(c => c.checked = false);
+        document.getElementById('modal-shift').classList.add('open');
+        if(empId) document.getElementById(`menu-${empId}`).classList.remove('show');
+    }
+
+    document.getElementById('form-shift').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const empId = document.getElementById('shift-emp-select').value;
+        const date = document.getElementById('shift-date').value;
+        const types = Array.from(document.querySelectorAll('.shift-check:checked')).map(c => c.value);
+        
+        if(types.length === 0) return alert('Select at least one shift');
+
+        types.forEach(type => {
+            state.shifts.push({
+                id: generateId('S'),
+                empId,
+                date,
+                type,
+                addedBy: state.currentUser,
+                createdAt: new Date().toISOString()
+            });
+        });
+
+        saveData();
+        closeModals();
+        showToast(`${types.length} shift(s) added`);
+    });
+
+    // Advance Logic
+    function openAdvanceModal(empId = null) {
+        const select = document.getElementById('adv-emp-select');
+        select.innerHTML = state.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+        if(empId) select.value = empId;
+        document.getElementById('adv-date').valueAsDate = new Date();
+        document.getElementById('modal-advance').classList.add('open');
+        if(empId) document.getElementById(`menu-${empId}`).classList.remove('show');
+    }
+
+    document.getElementById('form-advance').addEventListener('submit', (e) => {
+        e.preventDefault();
+        state.advances.push({
+            id: generateId('A'),
+            empId: document.getElementById('adv-emp-select').value,
+            amount: document.getElementById('adv-amount').value,
+            date: document.getElementById('adv-date').value,
+            remark: document.getElementById('adv-remark').value,
+            addedBy: state.currentUser,
+            createdAt: new Date().toISOString()
+        });
+        saveData();
+        closeModals();
+        showToast('Advance added');
+    });
+
+    // Excel Import Logic
+    function processExcel() {
+        const file = document.getElementById('excel-input').files[0];
+        if(!file) return alert('Please select a file');
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                let success = 0;
+                let failed = 0;
+                let duplicates = 0;
+
+                jsonData.forEach(row => {
+                    const empIdKey = Object.keys(row).find(k => k.toLowerCase().includes('employee id'));
+                    const dateKey = Object.keys(row).find(k => k.toLowerCase().includes('date'));
+                    const shiftKey = Object.keys(row).find(k => k.toLowerCase().includes('shift'));
+
+                    if(!empIdKey || !dateKey || !shiftKey) { failed++; return; }
+
+                    const rawEmpId = String(row[empIdKey]).trim();
+                    const date = row[dateKey]; 
+                    const shift = String(row[shiftKey]).toUpperCase().trim();
+
+                    const emp = state.employees.find(e => e.employeeId === rawEmpId || e.id === rawEmpId);
+                    
+                    if(!emp) {
+                        failed++;
+                    } else {
+                        const exists = state.shifts.some(s => s.empId === emp.id && s.date === date && s.type === shift);
+                        if(exists) {
+                            duplicates++; failed++;
+                        } else {
+                            state.shifts.push({
+                                id: generateId('S'),
+                                empId: emp.id,
+                                date: date,
+                                type: shift,
+                                addedBy: 'Excel Import',
+                                createdAt: new Date().toISOString()
+                            });
+                            success++;
+                        }
+                    }
+                });
+
+                const log = {
+                    id: generateId('IMP'),
+                    fileName: file.name,
+                    date: new Date().toLocaleDateString(),
+                    total: jsonData.length,
+                    success,
+                    failed
+                };
+                state.imports.push(log);
+                saveData();
+                showToast(`Import Complete: ${success} added, ${failed} failed/duplicates`);
+                router('import');
+            } catch(err) {
+                console.error(err);
+                alert('Error processing file');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function exportBalanceExcel() {
+        const table = document.getElementById('balance-table');
+        const ws = XLSX.utils.table_to_sheet(table);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Balance Report");
+        XLSX.writeFile(wb, "Balance_Report.xlsx");
+    }
+
+    function viewEmployeeDetail(id) {
+        document.getElementById(`menu-${id}`).classList.remove('show');
+        state.view = 'detail'; 
+        const app = document.getElementById('app');
+        app.innerHTML = renderEmployeeDetail(id);
+    }
+
+    render();
+
+</script>
+</body>
+</html>
